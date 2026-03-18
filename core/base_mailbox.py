@@ -411,9 +411,11 @@ class MoeMailMailbox(BaseMailbox):
         # 注册
         username = "".join(random.choices(string.ascii_lowercase + string.digits, k=12))
         password = "Test" + "".join(random.choices(string.digits, k=8)) + "!"
-        s.post(f"{self.api}/api/auth/register",
+        print(f"[MoeMail] 注册账号: {username} / {password}")
+        r_reg = s.post(f"{self.api}/api/auth/register",
             json={"username": username, "password": password, "turnstileToken": ""},
             timeout=15)
+        print(f"[MoeMail] 注册结果: {r_reg.status_code} {r_reg.text[:80]}")
         # 获取 CSRF
         csrf_r = s.get(f"{self.api}/api/auth/csrf", timeout=10)
         csrf = csrf_r.json().get("csrfToken", "")
@@ -422,29 +424,47 @@ class MoeMailMailbox(BaseMailbox):
             headers={"content-type": "application/x-www-form-urlencoded"},
             data=f"username={username}&password={password}&csrfToken={csrf}&redirect=false&callbackUrl={self.api}",
             allow_redirects=True, timeout=15)
-        # 提取 session token
+        self._session = s
         for cookie in s.cookies:
             if "session-token" in cookie.name:
                 self._session_token = cookie.value
-                self._session = s
+                print(f"[MoeMail] 登录成功")
                 return cookie.value
+        print(f"[MoeMail] 登录失败，cookies: {[c.name for c in s.cookies]}")
         return ""
 
     def get_email(self) -> MailboxAccount:
-        if not self._session_token:
-            self._register_and_login()
+        # 每次调用都重新注册新账号，保证邮箱唯一
+        self._session_token = None
+        self._register_and_login()
+        import random, string
+        name = "".join(random.choices(string.ascii_letters + string.digits, k=8))
+        # 获取可用域名列表，随机选一个
+        domain = "sall.cc"
+        try:
+            cfg_r = self._session.get(f"{self.api}/api/config", timeout=10)
+            domains = [d.strip() for d in cfg_r.json().get("emailDomains", "sall.cc").split(",") if d.strip()]
+            if domains:
+                domain = random.choice(domains)
+        except Exception:
+            pass
         r = self._session.post(f"{self.api}/api/emails/generate",
-            json={}, timeout=15)
+            json={"name": name, "domain": domain, "expiryTime": 86400000},
+            timeout=15)
         data = r.json()
         self._email = data.get("email", data.get("address", ""))
         email_id = data.get("id", "")
+        print(f"[MoeMail] 生成邮箱: {self._email} id={email_id} domain={domain} status={r.status_code}")
+        if not email_id:
+            print(f"[MoeMail] 生成失败: {data}")
+        if email_id:
+            self._email_count = getattr(self, '_email_count', 0) + 1
         return MailboxAccount(email=self._email, account_id=str(email_id))
 
     def get_current_ids(self, account: MailboxAccount) -> set:
         try:
-            r = self._session.get(f"{self.api}/api/emails/{account.account_id}/messages",
-                timeout=10)
-            return {str(m.get("id", "")) for m in r.json().get("messages", []) or r.json() if isinstance(r.json(), list)}
+            r = self._session.get(f"{self.api}/api/emails/{account.account_id}", timeout=10)
+            return {str(m.get("id", "")) for m in r.json().get("messages", [])}
         except Exception:
             return set()
 
@@ -455,22 +475,14 @@ class MoeMailMailbox(BaseMailbox):
         start = time.time()
         while time.time() - start < timeout:
             try:
-                r = self._session.get(f"{self.api}/api/emails/{account.account_id}/messages",
+                r = self._session.get(f"{self.api}/api/emails/{account.account_id}",
                     timeout=10)
-                data = r.json()
-                msgs = data if isinstance(data, list) else data.get("messages", [])
+                msgs = r.json().get("messages", [])
                 for msg in msgs:
                     mid = str(msg.get("id", ""))
                     if not mid or mid in seen: continue
                     seen.add(mid)
-                    # 获取邮件详情
-                    try:
-                        r2 = self._session.get(f"{self.api}/api/emails/{account.account_id}/messages/{mid}",
-                            timeout=10)
-                        detail = r2.json()
-                        body = str(detail.get("text") or detail.get("body") or "") + " " + str(detail.get("subject") or "")
-                    except Exception:
-                        body = str(msg.get("subject", ""))
+                    body = str(msg.get("content") or msg.get("text") or msg.get("body") or "") + " " + str(msg.get("subject") or "")
                     body = re.sub(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', '', body)
                     m = re.search(r'(?<!#)(?<!\d)(\d{6})(?!\d)', body)
                     if m: return m.group(1)

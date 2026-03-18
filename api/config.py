@@ -9,6 +9,7 @@ CONFIG_KEYS = [
     "yescaptcha_key", "twocaptcha_key",
     "default_executor", "default_captcha_solver",
     "duckmail_api_url", "duckmail_provider_url", "duckmail_bearer",
+    "moemail_api_url",
     "mail_provider",
     "cfworker_api_url", "cfworker_admin_token", "cfworker_domain", "cfworker_fingerprint",
     "cpa_api_url", "cpa_api_key",

@@ -9,6 +9,7 @@ const SELECT_FIELDS: Record<string, { label: string; value: string }[]> = {
     { label: 'Laoudo（固定邮箱）', value: 'laoudo' },
     { label: 'TempMail.lol（自动生成）', value: 'tempmail_lol' },
     { label: 'DuckMail（自动生成）', value: 'duckmail' },
+    { label: 'MoeMail (sall.cc)', value: 'moemail' },
     { label: 'CF Worker（自建域名）', value: 'cfworker' },
   ],
   default_executor: [
@@ -50,6 +51,12 @@ const TABS = [
         { key: 'laoudo_email', label: '邮箱地址', placeholder: 'xxx@laoudo.com' },
         { key: 'laoudo_account_id', label: 'Account ID', placeholder: '563' },
         { key: 'laoudo_auth', label: 'JWT Token', placeholder: 'eyJ...', secret: true },
+      ],
+    }, {
+      section: 'MoeMail',
+      desc: '自动注册账号并生成临时邮箱，默认无需配置',
+      items: [
+        { key: 'moemail_api_url', label: 'API URL', placeholder: 'https://sall.cc' },
       ],
     }, {
       section: 'TempMail.lol',
