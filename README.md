@@ -46,13 +46,32 @@ npm run build
 cd ..
 ```
 
-### 启动
+### 安装浏览器（可选，无头浏览器模式需要）
+
+```bash
+# Playwright 浏览器
+python3 -m playwright install chromium
+
+# Camoufox（用于本地 Turnstile Solver）
+python3 -m camoufox fetch
+```
+
+### 启动后端
 
 ```bash
 .venv/bin/python3 -m uvicorn main:app --port 8000
 ```
 
-浏览器访问 `http://localhost:8000`
+### 启动前端（开发模式）
+
+```bash
+cd frontend
+npm run dev
+```
+
+前端开发服务器运行在 `http://localhost:5173`，已配置代理自动转发 `/api` 请求到后端 8000 端口。
+
+浏览器访问 `http://localhost:5173`
 
 ## 项目结构
 
