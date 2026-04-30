@@ -38,6 +38,12 @@ jobs:
             --add-data "core:core" \
             --add-data "api:api" \
             --add-data "static:static" \
+            --collect-all browserforge \
+            --collect-all camoufox \
+            --collect-all apify_fingerprint_datapoints \
+            --collect-all language_tags \
+            --collect-all ua_parser \
+            --collect-all ua_parser_builtins \
             main.py
           mkdir -p electron/backend
           cp -r dist/backend electron/backend/
@@ -89,6 +95,12 @@ jobs:
             --add-data "core;core" `
             --add-data "api;api" `
             --add-data "static;static" `
+            --collect-all browserforge `
+            --collect-all camoufox `
+            --collect-all apify_fingerprint_datapoints `
+            --collect-all language_tags `
+            --collect-all ua_parser `
+            --collect-all ua_parser_builtins `
             main.py
           New-Item -ItemType Directory -Force -Path electron/backend
           Copy-Item -Recurse dist/backend electron/backend/
