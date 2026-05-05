@@ -2175,16 +2175,32 @@ def _do_add_phone_attempt(
         # 如果成功选了国家，输入本地号码；否则输入完整号码
         fill_value = local_number if country_selected else phone_number
         filled = _fill_input_like_user(page, phone_input_sel, fill_value)
+        # _fill_input_like_user 用严格相等验证，但 add-phone 页面可能在 input 中自动加了国家前缀
+        # 所以额外检查 input.value 是否包含我们填入的号码
+        if not filled:
+            try:
+                actual_val = str(page.evaluate(
+                    "(sel) => { const el = document.querySelector(sel); return el ? el.value : ''; }",
+                    phone_input_sel,
+                ) or "")
+                # 如果 input 值包含我们的号码（可能前面有 +56 之类的前缀），认为成功
+                if fill_value and fill_value in actual_val.replace(" ", "").replace("-", ""):
+                    filled = True
+                    log(f"  手机号已填写(含前缀): {actual_val[:12]}...")
+            except Exception:
+                pass
         if not filled:
             # fallback: 尝试先清空再用 keyboard.type 输入
             log(f"  _fill_input_like_user 失败，尝试 keyboard fallback...")
             try:
                 page.click(phone_input_sel)
                 time.sleep(0.3)
-                page.keyboard.press("Meta+a")
-                time.sleep(0.1)
-                page.keyboard.press("Backspace")
-                time.sleep(0.2)
+                # 三次全选删除确保清空
+                for _ in range(3):
+                    page.keyboard.press("Meta+a")
+                    time.sleep(0.1)
+                    page.keyboard.press("Backspace")
+                    time.sleep(0.1)
                 page.keyboard.type(fill_value, delay=random.randint(30, 70))
                 time.sleep(0.3)
                 # 验证输入值
@@ -2192,9 +2208,10 @@ def _do_add_phone_attempt(
                     "(sel) => { const el = document.querySelector(sel); return el ? el.value : ''; }",
                     phone_input_sel,
                 )
-                if fill_value in str(actual or ""):
+                actual_clean = str(actual or "").replace(" ", "").replace("-", "")
+                if fill_value in actual_clean:
                     filled = True
-                    log(f"  keyboard fallback 成功: {str(actual or '')[:8]}...")
+                    log(f"  keyboard fallback 成功: {str(actual or '')[:12]}...")
             except Exception as e:
                 log(f"  keyboard fallback 失败: {e}")
         if not filled:
@@ -2215,7 +2232,7 @@ def _do_add_phone_attempt(
                       const nativeEvent = new Event('input', { bubbles: true });
                       Object.defineProperty(nativeEvent, 'target', { writable: false, value: input });
                       input.dispatchEvent(nativeEvent);
-                      return input.value === value;
+                      return input.value.includes(value);
                     }
                     """,
                     {"selector": phone_input_sel, "value": fill_value},

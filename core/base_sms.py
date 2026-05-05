@@ -398,9 +398,14 @@ class HeroSmsProvider(BaseSmsProvider):
         if isinstance(data, list):
             return data
         if isinstance(data, dict):
+            # 检查是否是错误响应 {"status":0,"message":"No access","data":[]}
+            if data.get("status") == 0 or data.get("message") == "No access":
+                raise RuntimeError(f"SMS API access denied: {data.get('message', 'unknown')}")
             # HeroSMS 可能返回 {"0": {"id": 0, "eng": "Russia"}, ...} 格式
             result = []
             for key, value in data.items():
+                if key in ("status", "message", "data", "error"):
+                    continue
                 if isinstance(value, dict):
                     if "id" not in value:
                         value["id"] = key
@@ -409,7 +414,7 @@ class HeroSmsProvider(BaseSmsProvider):
                     result.append({"id": key, "eng": value, "name": value})
             if result:
                 return result
-        raise RuntimeError("HeroSMS getCountries returned unexpected response")
+        raise RuntimeError("SMS getCountries returned unexpected response")
 
     def get_prices(self, service: str | None = None, country: str | int | None = None) -> dict:
         params = {"action": "getPrices"}
@@ -534,11 +539,9 @@ class HeroSmsProvider(BaseSmsProvider):
         # OpenAI 2025年起对大量国家改用 WhatsApp 验证，HeroSMS 无法接收 WhatsApp
         # 以下国家经测试确认走 SMS：
         ALLOWED_COUNTRIES = {
-            "29",   # Serbia
             "32",   # Romania
             "33",   # Colombia
             "39",   # Argentina
-            "46",   # Sweden
             "52",   # Thailand (已验证走SMS)
             "54",   # Mexico
             "56",   # Spain
@@ -1018,6 +1021,21 @@ class HeroSmsProvider(BaseSmsProvider):
             }
 
 
+class SmsBowerProvider(HeroSmsProvider):
+    """SMSBower provider — API 兼容 HeroSMS，仅 base URL 不同。"""
+
+    BASE_URL = "https://smsbower.page/stubs/handler_api.php"
+
+    def _request(self, params: dict, *, needs_key: bool = True, timeout: int = 30) -> requests.Response:
+        # SMSBower 所有接口都需要 api_key（包括 getServicesList、getCountries）
+        payload = dict(params)
+        if needs_key or self.api_key:
+            payload["api_key"] = self.api_key
+        resp = requests.get(self.BASE_URL, params=payload, timeout=timeout, proxies=self.proxies)
+        resp.raise_for_status()
+        return resp
+
+
 def is_herosms_phone_cache_alive(config: dict | None = None) -> tuple[bool, dict]:
     """Return whether the current HeroSMS cache is reusable for scheduling."""
     config = dict(config or {})
@@ -1062,6 +1080,19 @@ def create_sms_provider(provider_key: str, config: dict) -> BaseSmsProvider:
             reuse_phone_to_max=_safe_bool(config.get("register_reuse_phone_to_max"), True),
             phone_success_max=max(0, _safe_int(config.get("register_phone_extra_max") or config.get("register_phone_success_max"), 3)),
         )
+    if provider_key in ("smsbower", "smsbower_api"):
+        api_key = str(config.get("smsbower_api_key", "") or "").strip()
+        if not api_key:
+            raise RuntimeError("SMSBower 未配置 API Key")
+        return SmsBowerProvider(
+            api_key=api_key,
+            default_service=str(config.get("sms_service") or config.get("smsbower_service") or config.get("smsbower_default_service") or HERO_SMS_DEFAULT_SERVICE),
+            default_country=str(config.get("sms_country") or config.get("smsbower_country") or config.get("smsbower_default_country") or HERO_SMS_DEFAULT_COUNTRY),
+            max_price=_safe_float(config.get("smsbower_max_price"), -1),
+            proxy=str(config.get("sms_proxy") or config.get("proxy") or "") or None,
+            reuse_phone_to_max=_safe_bool(config.get("register_reuse_phone_to_max"), True),
+            phone_success_max=max(0, _safe_int(config.get("register_phone_extra_max") or config.get("register_phone_success_max"), 3)),
+        )
     raise RuntimeError(f"未知的接码服务: {provider_key}")
 
 
@@ -1095,12 +1126,12 @@ class PhoneCallbackController:
 
             # 智能国家选择：如果启用了 auto_select_country，自动查询最优国家
             effective_country = self.country
-            auto_select = _safe_bool(self.config.get("herosms_auto_country"), False)
+            auto_select = _safe_bool(self.config.get("herosms_auto_country") or self.config.get("smsbower_auto_country"), False)
             if auto_select and isinstance(provider, HeroSmsProvider):
                 self.log("正在查询最优国家（价格最低 + 库存充足）...")
                 try:
-                    min_stock = _safe_int(self.config.get("herosms_auto_country_min_stock"), 20)
-                    max_price_limit = _safe_float(self.config.get("herosms_auto_country_max_price"), 0)
+                    min_stock = _safe_int(self.config.get("herosms_auto_country_min_stock") or self.config.get("smsbower_auto_country_min_stock"), 20)
+                    max_price_limit = _safe_float(self.config.get("herosms_auto_country_max_price") or self.config.get("smsbower_auto_country_max_price"), 0)
                     best = provider.get_best_country(
                         service=self.service,
                         min_stock=min_stock,

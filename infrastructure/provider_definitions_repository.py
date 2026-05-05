@@ -282,6 +282,26 @@ _BUILTIN_DEFINITIONS: list[dict] = [
             {"key": "sms_activate_default_country", "label": "默认国家代码", "placeholder": "ru"},
         ],
     },
+    {
+        "provider_type": "sms",
+        "provider_key": "smsbower_api",
+        "label": "SMSBower",
+        "description": "SMSBower 接码平台，API 兼容 HeroSMS，支持号码复用和自动重发",
+        "driver_type": "smsbower_api",
+        "default_auth_mode": "apikey",
+        "enabled": True,
+        "category": "thirdparty",
+        "auth_modes": [{"value": "apikey", "label": "API Key"}],
+        "fields": [
+            {"key": "smsbower_api_key", "label": "API Key", "secret": True, "category": "auth"},
+            {"key": "smsbower_default_country", "label": "默认国家", "type": "async-select", "asyncUrl": "/sms/smsbower/countries", "asyncValueKey": "id", "asyncLabelKey": "chn", "placeholder": "请选择国家..."},
+            {"key": "smsbower_default_service", "label": "默认服务", "type": "async-select", "asyncUrl": "/sms/smsbower/services", "asyncValueKey": "code", "asyncLabelKey": "name", "placeholder": "请选择服务..."},
+            {"key": "smsbower_max_price", "label": "最大价格 (可选)", "placeholder": "-1"},
+            {"key": "smsbower_auto_country", "label": "自动选择最优国家", "type": "toggle", "hint": "启用后忽略默认国家，自动选择价格最低且库存充足的国家"},
+            {"key": "register_phone_extra_max", "label": "号码复用额外上限", "placeholder": "3"},
+            {"key": "register_reuse_phone_to_max", "label": "复用号码至最大", "type": "toggle"},
+        ],
+    },
     # ── proxy ────────────────────────────────────────────────────────
     {
         "provider_type": "proxy",
