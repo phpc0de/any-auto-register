@@ -96,7 +96,7 @@ app = FastAPI(title="Account Manager", version="2.0.0", lifespan=lifespan)
 app.add_middleware(AuthMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=os.environ.get("CORS_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000").split(","),
     allow_methods=["*"],
     allow_headers=["*"],
 )

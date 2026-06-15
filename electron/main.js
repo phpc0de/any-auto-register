@@ -168,46 +168,46 @@ app.whenReady().then(async () => {
 
   createWindow()
 
-  // ── 自动更新（仅 Windows，macOS 未签名不支持） ──
-  if (process.platform === 'win32' && !isDev) {
-    autoUpdater.autoDownload = false
-    autoUpdater.autoInstallOnAppQuit = true
+  // ── 自动更新已禁用（安全原因） ──
+  // if (process.platform === 'win32' && !isDev) {
+  //   autoUpdater.autoDownload = false
+  //   autoUpdater.autoInstallOnAppQuit = true
 
-    autoUpdater.on('update-available', (info) => {
-      dialog.showMessageBox(mainWindow, {
-        type: 'info',
-        title: '发现新版本',
-        message: `新版本 v${info.version} 可用，是否下载？`,
-        buttons: ['下载更新', '稍后'],
-        defaultId: 0,
-      }).then(({ response }) => {
-        if (response === 0) {
-          autoUpdater.downloadUpdate()
-        }
-      })
-    })
+  //   autoUpdater.on('update-available', (info) => {
+  //     dialog.showMessageBox(mainWindow, {
+  //       type: 'info',
+  //       title: '发现新版本',
+  //       message: `新版本 v${info.version} 可用，是否下载？`,
+  //       buttons: ['下载更新', '稍后'],
+  //       defaultId: 0,
+  //     }).then(({ response }) => {
+  //       if (response === 0) {
+  //         autoUpdater.downloadUpdate()
+  //       }
+  //     })
+  //   })
 
-    autoUpdater.on('update-downloaded', () => {
-      dialog.showMessageBox(mainWindow, {
-        type: 'info',
-        title: '更新就绪',
-        message: '新版本已下载完成，重启应用即可安装。',
-        buttons: ['立即重启', '稍后'],
-        defaultId: 0,
-      }).then(({ response }) => {
-        if (response === 0) {
-          autoUpdater.quitAndInstall()
-        }
-      })
-    })
+  //   autoUpdater.on('update-downloaded', () => {
+  //     dialog.showMessageBox(mainWindow, {
+  //       type: 'info',
+  //       title: '更新就绪',
+  //       message: '新版本已下载完成，重启应用即可安装。',
+  //       buttons: ['立即重启', '稍后'],
+  //       defaultId: 0,
+  //     }).then(({ response }) => {
+  //       if (response === 0) {
+  //         autoUpdater.quitAndInstall()
+  //       }
+  //     })
+  //   })
 
-    autoUpdater.on('error', (err) => {
-      console.error('[updater] 检查更新失败:', err.message)
-    })
+  //   autoUpdater.on('error', (err) => {
+  //     console.error('[updater] 检查更新失败:', err.message)
+  //   })
 
-    // 启动后 10 秒检查更新
-    setTimeout(() => autoUpdater.checkForUpdates(), 10000)
-  }
+  //   // 启动后 10 秒检查更新
+  //   setTimeout(() => autoUpdater.checkForUpdates(), 10000)
+  // }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
