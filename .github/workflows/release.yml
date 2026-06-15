@@ -4,14 +4,16 @@ on:
   push:
     tags:
       - 'v*'  # 推送 v1.0.0 这样的 tag 时触发
-  workflow_dispatch:
-  
+  workflow_dispatch: # 支持手动触发
+
 jobs:
   build-docker:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    outputs:
+      version: ${{ steps.version.outputs.version }} # 将版本号传递给 release 任务
     steps:
       - uses: actions/checkout@v4
 
@@ -27,7 +29,13 @@ jobs:
 
       - name: Extract version
         id: version
-        run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+        # 如果是手动触发，GITHUB_REF_NAME 可能是分支名(如 main)，这里加个容错处理
+        run: |
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+          else
+            echo "version=manual-${{ github.run_number }}" >> $GITHUB_OUTPUT
+          fi
 
       - name: Inject version into source
         run: echo '__version__ = "${{ steps.version.outputs.version }}"' > core/version.py
@@ -45,13 +53,24 @@ jobs:
           cache-to: type=gha,mode=max
 
   release:
-    needs: [ build-docker]
+    needs: [build-docker]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      # 1. 修复：必须先 checkout 代码，Release 才能正确生成 Release Notes
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 获取完整历史以生成准确的 Release Notes
+
+      # 2. 修复：处理手动触发时没有 tag 的情况
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          # 如果是 tag 触发，自动使用该 tag；如果是手动触发，使用我们定义的临时 tag
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', needs.build-docker.outputs.version) }}
           files: dist/*
           generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
